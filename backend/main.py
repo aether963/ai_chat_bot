@@ -20,7 +20,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://ai-chat-bot-pied-omega.vercel.app"
+        "https://ai-chat-bot-pied-omega.vercel.app",
+        "https://ai-chat-eigeyn6j2-rajgupta9559-6026.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["*"],
