@@ -18,6 +18,7 @@ class ChatState(TypedDict):
 # 2. Initialize the LLM
 model = ChatOpenAI(
     model="gpt-4o-mini",
+    streaming=True,
     temperature=0.7
 )
 

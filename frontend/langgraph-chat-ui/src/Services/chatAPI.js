@@ -1,6 +1,6 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
-export async function sendMessage(message, threadId) {
+export async function sendMessage(message, threadId, onToken) {
   let response;
 
   try {
@@ -20,31 +20,53 @@ export async function sendMessage(message, threadId) {
     );
   }
 
-  // Read the response as text first.
-  const responseText = await response.text();
-
-  console.log("Backend status:", response.status);
-  console.log("Backend response:", responseText);
-
-  // Handle empty responses.
-  if (!responseText) {
-    throw new Error(
-      `Backend returned an empty response. HTTP ${response.status}`,
-    );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Backend error: ${errorText || response.status}`);
   }
 
-  // Parse JSON safely.
-  let data;
+  if (!response.body) {
+    throw new Error("Backend does not support streaming responses.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  let buffer = "";
+  let thread_id = threadId;
 
   try {
-    data = JSON.parse(responseText);
-  } catch {
-    throw new Error(`Backend returned invalid JSON: ${responseText}`);
+    while (true) {
+      const { value, done } = await reader.read();
+
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+
+      for (const event of events) {
+        const dataLine = event
+          .split("\n")
+          .find((line) => line.startsWith("data:"));
+
+        if (!dataLine) continue;
+
+        const data = JSON.parse(dataLine.slice(5).trim());
+
+        if (data.type === "token") {
+          onToken(data.content);
+        } else if (data.type === "done") {
+          thread_id = data.thread_id;
+        } else if (data.type === "error") {
+          throw new Error(data.message);
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
 
-  if (!response.ok) {
-    throw new Error(data.detail || `Backend error: HTTP ${response.status}`);
-  }
-
-  return data;
+  return { thread_id };
 }

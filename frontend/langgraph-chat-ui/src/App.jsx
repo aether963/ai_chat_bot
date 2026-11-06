@@ -14,11 +14,10 @@ function createChat() {
 
 export default function App() {
   const [chats, setChats] = useState(() => [createChat()]);
-  const [activeChatId, setActiveChatId] = useState(() => null);
+  const [activeChatId, setActiveChatId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Use the first available conversation initially.
   const currentChatId = activeChatId ?? chats[0]?.id;
   const activeChat = chats.find((chat) => chat.id === currentChatId);
 
@@ -62,8 +61,15 @@ export default function App() {
       content: message,
     };
 
+    const assistantMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: "",
+    };
+
     setIsLoading(true);
 
+    // Add user message and an empty assistant message.
     setChats((previous) =>
       previous.map((chat) => {
         if (chat.id !== chatId) return chat;
@@ -75,46 +81,50 @@ export default function App() {
           title: isFirstMessage
             ? message.slice(0, 35) + (message.length > 35 ? "..." : "")
             : chat.title,
-          messages: [...chat.messages, userMessage],
+          messages: [...chat.messages, userMessage, assistantMessage],
         };
       }),
     );
 
     try {
-      // Call the actual LangGraph backend
-      const data = await sendMessage(message, chatId);
-
-      const assistantMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: data.answer,
-      };
-
-      setChats((previous) =>
-        previous.map((chat) =>
-          chat.id === chatId
-            ? {
-                ...chat,
-                messages: [...chat.messages, assistantMessage],
-              }
-            : chat,
-        ),
-      );
+      // Receive tokens as they arrive from the backend.
+      await sendMessage(message, chatId, (token) => {
+        setChats((previous) =>
+          previous.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  messages: chat.messages.map((msg) =>
+                    msg.id === assistantMessage.id
+                      ? {
+                          ...msg,
+                          content: msg.content + token,
+                        }
+                      : msg,
+                  ),
+                }
+              : chat,
+          ),
+        );
+      });
     } catch (error) {
       console.error("Backend error:", error);
 
-      const errorMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `Sorry, something went wrong: ${error.message}`,
-      };
-
       setChats((previous) =>
         previous.map((chat) =>
           chat.id === chatId
             ? {
                 ...chat,
-                messages: [...chat.messages, errorMessage],
+                messages: chat.messages.map((msg) =>
+                  msg.id === assistantMessage.id
+                    ? {
+                        ...msg,
+                        content: msg.content
+                          ? `${msg.content}\n\n[Error: ${error.message}]`
+                          : `Sorry, something went wrong: ${error.message}`,
+                      }
+                    : msg,
+                ),
               }
             : chat,
         ),
