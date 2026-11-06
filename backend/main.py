@@ -1,24 +1,70 @@
+
 import json
 import logging
+import os
+from contextlib import asynccontextmanager
+from uuid import UUID
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from uuid import UUID
 
+from psycopg_pool import AsyncConnectionPool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langchain_core.messages import HumanMessage
 
-from graph import chatbot
+from graph import builder
 
 logger = logging.getLogger(__name__)
 
-# 1. Initialize FastAPI
+# Hold shared database resources and compiled graph
+resources = {}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    database_url = os.environ["DATABASE_URL"]
+
+    # Create PostgreSQL connection pool
+    pool = AsyncConnectionPool(
+        conninfo=database_url,
+        max_size=10,
+        kwargs={"autocommit": True},
+        open=False,
+    )
+
+    await pool.open()
+
+    try:
+        # Initialize LangGraph PostgreSQL checkpointer
+        checkpointer = AsyncPostgresSaver(pool)
+
+        # Create checkpoint tables if they don't exist
+        await checkpointer.setup()
+
+        # Compile graph with persistent checkpointing
+        chatbot = builder.compile(checkpointer=checkpointer)
+
+        resources["chatbot"] = chatbot
+
+        logger.info("PostgreSQL checkpointing initialized")
+
+        yield
+
+    finally:
+        resources.clear()
+        await pool.close()
+
+
+# Initialize FastAPI
 app = FastAPI(
-    title="LangGraph Chat API"
+    title="LangGraph Chat API",
+    lifespan=lifespan
 )
 
 
-# 2. Configure CORS
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -31,21 +77,19 @@ app.add_middleware(
 )
 
 
-# 3. Define request schema
 class ChatRequest(BaseModel):
     message: str
     thread_id: UUID
-
-# enabling streaming
 
 
 def sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-# 5. Create chat endpoint
 @app.post("/chat")
 async def chat(request: ChatRequest):
+
+    chatbot = resources["chatbot"]
 
     config = {
         "configurable": {
@@ -100,7 +144,6 @@ async def chat(request: ChatRequest):
     )
 
 
-# 6. Health check endpoint
 @app.get("/")
 def home():
     return {
