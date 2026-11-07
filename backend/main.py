@@ -3,7 +3,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from uuid import UUID
-
+from datetime import datetime, timezone
+from pydantic import BaseModel, Field
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -46,7 +47,7 @@ async def lifespan(app: FastAPI):
         chatbot = builder.compile(checkpointer=checkpointer)
 
         resources["chatbot"] = chatbot
-
+        resources["pool"] = pool
         logger.info("PostgreSQL checkpointing initialized")
 
         yield
@@ -76,6 +77,11 @@ app.add_middleware(
 )
 
 
+class CreateChatRequest(BaseModel):
+    id: UUID
+    title: str = Field(default="New chat", max_length=255)
+
+
 class ChatRequest(BaseModel):
     message: str
     thread_id: UUID
@@ -83,6 +89,60 @@ class ChatRequest(BaseModel):
 
 def sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
+
+
+@app.get("/chats")
+async def get_chats():
+
+    pool = resources["pool"]
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT id, title, created_at, updated_at
+                FROM chats
+                ORDER BY updated_at DESC
+                """
+            )
+
+            rows = await cur.fetchall()
+
+    return [
+        {
+            "id": str(row[0]),
+            "title": row[1],
+            "created_at": row[2].isoformat(),
+            "updated_at": row[3].isoformat()
+        }
+        for row in rows
+    ]
+
+
+@app.post("/chats")
+async def create_chat(request: CreateChatRequest):
+
+    pool = resources["pool"]
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO chats (id, title)
+                VALUES (%s, %s)
+                RETURNING id, title, created_at, updated_at
+                """,
+                (request.id, request.title)
+            )
+
+            chat = await cur.fetchone()
+
+    return {
+        "id": str(chat[0]),
+        "title": chat[1],
+        "created_at": chat[2].isoformat(),
+        "updated_at": chat[3].isoformat()
+    }
 
 
 @app.post("/chat")
