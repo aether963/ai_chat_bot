@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from psycopg import AsyncConnection
 from uuid import UUID
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
@@ -28,12 +29,15 @@ async def lifespan(app: FastAPI):
 
     # Create PostgreSQL connection pool
     pool = AsyncConnectionPool(
-        conninfo=database_url,
-        max_size=10,
-        kwargs={"autocommit": True},
-        open=False,
-    )
-
+    conninfo=database_url,
+    min_size=1,
+    max_size=5,
+    max_idle=60,
+    max_lifetime=300,
+    check=AsyncConnectionPool.check_connection,
+    kwargs={"autocommit": True},
+    open=False,
+)
     await pool.open()
 
     try:
