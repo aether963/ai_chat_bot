@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-
+from fastapi import FastAPI, HTTPException
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langchain_core.messages import HumanMessage
@@ -212,3 +212,62 @@ def home():
     return {
         "message": "LangGraph Chat API is running"
     }
+
+
+@app.get("/chats/{chat_id}")
+async def get_chat(chat_id: UUID):
+
+    pool = resources["pool"]
+    chatbot = resources["chatbot"]
+
+    # 1. Check whether chat exists
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT id, title FROM chats WHERE id = %s",
+                (chat_id,)
+            )
+
+            chat = await cur.fetchone()
+
+    if not chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat not found"
+        )
+
+    # 2. Retrieve LangGraph checkpoint state
+    config = {
+        "configurable": {
+            "thread_id": str(chat_id)
+        }
+    }
+
+    state = await chatbot.aget_state(config)
+
+    # 3. Convert LangChain messages into API response
+    messages = []
+
+    if state.values:
+        for message in state.values.get("messages", []):
+
+            if message.type == "human":
+                role = "user"
+            elif message.type == "ai":
+                role = "assistant"
+            else:
+                continue
+
+            messages.append({
+                "id": str(message.id),
+                "role": role,
+                "content": message.content
+            })
+
+    # 4. Return chat and messages
+    return {
+        "id": str(chat[0]),
+        "title": chat[1],
+        "messages": messages
+    }
+
