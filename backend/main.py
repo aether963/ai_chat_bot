@@ -1,9 +1,11 @@
-
+import psycopg
 import json
 import logging
+import secrets
 import os
 from contextlib import asynccontextmanager
 from uuid import UUID
+from fastapi import Header, HTTPException
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -149,3 +151,51 @@ def home():
     return {
         "message": "LangGraph Chat API is running"
     }
+
+
+
+
+@app.post("/admin/initialize-database")
+async def initialize_database(
+    x_init_token: str = Header(...)
+):
+    expected_token = os.environ.get("DB_INIT_TOKEN", "")
+
+    # Validate secret token
+    if not expected_token or not secrets.compare_digest(
+        x_init_token, expected_token
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden"
+        )
+
+    database_url = os.environ["DATABASE_URL"]
+
+    try:
+        async with await psycopg.AsyncConnection.connect(
+            database_url,
+            autocommit=True
+        ) as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS chats (
+                    id UUID PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL DEFAULT 'New chat',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+            """)
+
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chats_updated_at
+                ON chats (updated_at DESC);
+            """)
+
+        return {"message": "Chats table created successfully"}
+
+    except Exception:
+        logger.exception("Database initialization failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Database initialization failed"
+        )
