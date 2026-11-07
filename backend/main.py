@@ -271,3 +271,52 @@ async def get_chat(chat_id: UUID):
         "messages": messages
     }
 
+
+@app.delete("/chats/{chat_id}")
+async def delete_chat(chat_id: UUID):
+
+    pool = resources["pool"]
+
+    # Delete chat metadata
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                DELETE FROM chats
+                WHERE id = %s
+                RETURNING id
+                """,
+                (chat_id,)
+            )
+
+            deleted_chat = await cur.fetchone()
+
+    if not deleted_chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat not found"
+        )
+
+    # Delete LangGraph checkpoints
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM checkpoints WHERE thread_id = %s",
+                (str(chat_id),)
+            )
+
+            await cur.execute(
+                "DELETE FROM checkpoint_blobs WHERE thread_id = %s",
+                (str(chat_id),)
+            )
+
+            await cur.execute(
+                "DELETE FROM checkpoint_writes WHERE thread_id = %s",
+                (str(chat_id),)
+            )
+
+    return {
+        "message": "Chat and its conversation history deleted successfully",
+        "chat_id": str(chat_id)
+    }
+
