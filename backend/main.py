@@ -29,15 +29,15 @@ async def lifespan(app: FastAPI):
 
     # Create PostgreSQL connection pool
     pool = AsyncConnectionPool(
-    conninfo=database_url,
-    min_size=1,
-    max_size=5,
-    max_idle=60,
-    max_lifetime=300,
-    check=AsyncConnectionPool.check_connection,
-    kwargs={"autocommit": True},
-    open=False,
-)
+        conninfo=database_url,
+        min_size=1,
+        max_size=5,
+        max_idle=60,
+        max_lifetime=300,
+        check=AsyncConnectionPool.check_connection,
+        kwargs={"autocommit": True},
+        open=False,
+    )
     await pool.open()
 
     try:
@@ -320,3 +320,39 @@ async def delete_chat(chat_id: UUID):
         "chat_id": str(chat_id)
     }
 
+
+class UpdateChatRequest(BaseModel):
+    title: str = Field(max_length=255)
+
+
+@app.patch("/chats/{chat_id}")
+async def update_chat(chat_id: UUID, request: UpdateChatRequest):
+    pool = resources["pool"]
+
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE chats
+                SET title = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                RETURNING id, title, created_at, updated_at
+                """,
+                (request.title, chat_id),
+            )
+
+            chat = await cur.fetchone()
+
+            if chat is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Chat not found",
+                )
+
+    return {
+        "id": str(chat[0]),
+        "title": chat[1],
+        "created_at": chat[2],
+        "updated_at": chat[3],
+    }

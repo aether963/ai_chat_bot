@@ -1,5 +1,58 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
+// 1. Create a new chat
+export async function createChat(chat) {
+  const response = await fetch(`${API_URL}/chats`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(chat),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create chat: HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// 2. Get all chats
+export async function getChats() {
+  const response = await fetch(`${API_URL}/chats`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch chats: HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// 3. Get a specific chat with messages
+export async function getChat(chatId) {
+  const response = await fetch(`${API_URL}/chats/${chatId}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch chat: HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// 4. Delete a chat
+export async function deleteChat(chatId) {
+  const response = await fetch(`${API_URL}/chats/${chatId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete chat: HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// 5. Send message with streaming
 export async function sendMessage(message, threadId, onToken) {
   let response;
 
@@ -69,4 +122,20 @@ export async function sendMessage(message, threadId, onToken) {
   }
 
   return { thread_id };
+}
+
+export async function updateChat(chatId, title) {
+  const response = await fetch(`${API_URL}/chats/${chatId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update chat: HTTP ${response.status}`);
+  }
+
+  return response.json();
 }

@@ -850,3 +850,121 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Sidebar conversation row */
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  border-radius: 8px;
+  padding: 4px 6px;
+  transition: background 0.2s ease;
+}
+
+.history-item:hover {
+  background: #25262e;
+}
+
+.history-item.active {
+  background: #292a33;
+}
+
+/* Conversation title button */
+.history-select {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+  color: #e4e4eb;
+  padding: 7px 3px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-select span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+/* Rename input and controls */
+.rename-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.rename-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 30px;
+  padding: 5px 8px;
+  background: #101116;
+  border: 1px solid #6366f1;
+  border-radius: 6px;
+  color: #f4f4f5;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.rename-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+/* Rename and delete action buttons */
+.history-action,
+.history-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: #9294a3;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.history-action:hover {
+  background: #373844;
+  color: #ffffff;
+}
+
+.history-delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.save-button:hover {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.cancel-button:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+/* Keep action buttons subtle until hover */
+.history-item:not(:hover) .history-action,
+.history-item:not(:hover) .history-delete {
+  opacity: 0.65;
+}

@@ -87,25 +87,36 @@ export default function ChatWindow({
           </div>
         ) : (
           <div className="messages-list">
-            {chat.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
+            {chat.messages
+              .filter(
+                (message) =>
+                  !(
+                    isLoading &&
+                    message.role === "assistant" &&
+                    !message.content
+                  ),
+              )
+              .map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
 
-            {isLoading && (
-              <div className="message-row assistant-row">
-                <div className="message-avatar">
-                  <Sparkles size={18} />
-                </div>
-                <div className="message-content">
-                  <div className="message-author">Neural Chat</div>
-                  <div className="typing-indicator" aria-label="Thinking">
-                    <span />
-                    <span />
-                    <span />
+            {isLoading &&
+              chat.messages[chat.messages.length - 1]?.role === "assistant" &&
+              !chat.messages[chat.messages.length - 1]?.content && (
+                <div className="message-row assistant-row">
+                  <div className="message-avatar">
+                    <Sparkles size={18} />
+                  </div>
+                  <div className="message-content">
+                    <div className="message-author">Neural Chat</div>
+                    <div className="typing-indicator" aria-label="Thinking">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             <div ref={bottomRef} />
           </div>
