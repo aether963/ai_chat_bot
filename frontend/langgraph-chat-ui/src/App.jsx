@@ -264,6 +264,24 @@ export default function App() {
     }
   }
 
+  async function handleRenameChat(chatId, newTitle) {
+    const title = newTitle.trim();
+
+    if (!title) return;
+
+    try {
+      await updateChat(chatId, title);
+
+      setChats((previous) =>
+        previous.map((chat) =>
+          chat.id === chatId ? { ...chat, title } : chat,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to rename chat:", error);
+    }
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -287,20 +305,4 @@ export default function App() {
       )}
     </div>
   );
-}
-
-async function handleRenameChat(chatId, newTitle) {
-  const title = newTitle.trim();
-
-  if (!title) return;
-
-  try {
-    await updateChat(chatId, title);
-
-    setChats((previous) =>
-      previous.map((chat) => (chat.id === chatId ? { ...chat, title } : chat)),
-    );
-  } catch (error) {
-    console.error("Failed to rename chat:", error);
-  }
 }
